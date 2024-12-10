@@ -106,7 +106,7 @@ class _CalculatorViewState extends State<CalculatorView> {
       expression = expression.replaceAll(" ", "");
 
       // Evaluate the expression manually
-      double result = _evaluateManually(expression);
+      double result = _evaluateExpressionManually(expression);
 
       // Update the text field with the result
       setState(() {
@@ -120,59 +120,63 @@ class _CalculatorViewState extends State<CalculatorView> {
     }
   }
 
-  double _evaluateManually(String expression) {
-    // Basic logic to evaluate addition, subtraction, multiplication, and division
-    expression = expression.replaceAll(",", ".");
+  double _evaluateExpressionManually(String expression) {
+    List<String> tokens = _tokenizeExpression(expression);
 
-    // Split by + and - first to prioritize those operations
-    List<String> terms = _splitByOperators(expression, ['+', '-']);
-
-    double result = _evaluateTerms(terms[0]);
-
-    for (int i = 1; i < terms.length; i++) {
-      if (expression.contains('+')) {
-        result += _evaluateTerms(terms[i]);
-      } else if (expression.contains('-')) {
-        result -= _evaluateTerms(terms[i]);
+    // First pass: Handle multiplication, division, and modulus
+    List<String> processedTokens = [];
+    for (int i = 0; i < tokens.length; i++) {
+      if (tokens[i] == "*" || tokens[i] == "/" || tokens[i] == "%") {
+        double left = double.parse(processedTokens.removeLast());
+        double right = double.parse(tokens[++i]);
+        if (tokens[i - 1] == "*") {
+          processedTokens.add((left * right).toString());
+        } else if (tokens[i - 1] == "/") {
+          processedTokens.add((left / right).toString());
+        } else if (tokens[i - 1] == "%") {
+          processedTokens.add((left % right).toString());
+        }
+      } else {
+        processedTokens.add(tokens[i]);
       }
     }
+
+    // Second pass: Handle addition and subtraction
+    double result = double.parse(processedTokens[0]);
+    for (int i = 1; i < processedTokens.length; i++) {
+      if (processedTokens[i] == "+" || processedTokens[i] == "-") {
+        double nextValue = double.parse(processedTokens[++i]);
+        if (processedTokens[i - 1] == "+") {
+          result += nextValue;
+        } else if (processedTokens[i - 1] == "-") {
+          result -= nextValue;
+        }
+      }
+    }
+
     return result;
   }
 
-  double _evaluateTerms(String expression) {
-    // Now evaluate multiplication and division
-    List<String> terms = _splitByOperators(expression, ['*', '/']);
-
-    double result = double.parse(terms[0]);
-
-    for (int i = 1; i < terms.length; i++) {
-      if (expression.contains('*')) {
-        result *= double.parse(terms[i]);
-      } else if (expression.contains('/')) {
-        result /= double.parse(terms[i]);
-      }
-    }
-    return result;
-  }
-
-  List<String> _splitByOperators(String expression, List<String> operators) {
-    List<String> terms = [];
-    int lastOperatorIndex = 0;
-    bool insideNumber = false;
+  List<String> _tokenizeExpression(String expression) {
+    // Convert expression into a list of numbers and operators
+    List<String> tokens = [];
+    StringBuffer currentToken = StringBuffer();
 
     for (int i = 0; i < expression.length; i++) {
       String char = expression[i];
-
-      if (operators.contains(char)) {
-        if (insideNumber) {
-          terms.add(expression.substring(lastOperatorIndex, i));
-          insideNumber = false;
+      if ("0123456789.".contains(char)) {
+        currentToken.write(char);
+      } else {
+        if (currentToken.isNotEmpty) {
+          tokens.add(currentToken.toString());
+          currentToken.clear();
         }
-        lastOperatorIndex = i + 1;
+        tokens.add(char);
       }
     }
-    terms.add(expression.substring(lastOperatorIndex));
-
-    return terms;
+    if (currentToken.isNotEmpty) {
+      tokens.add(currentToken.toString());
+    }
+    return tokens;
   }
 }
